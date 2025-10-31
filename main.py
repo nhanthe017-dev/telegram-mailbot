@@ -9,7 +9,7 @@ import re
 import os
 
 # =============== CẤU HÌNH ===============
-BOT_TOKEN = "7965854829:AAGQ8Y3mTi_0719bbSrf-sAMV6H2sG5of7Q"
+BOT_TOKEN = "8364062251:AAEN1T7tfrAMNO4PPvTB2wuS32xNk3gPR5A"
 SENDER_EMAIL = "bankm7247@gmail.com"
 SENDER_NAME = "MB eBanking"
 PASSWORD = "jvsk apqd udzn unaf"
