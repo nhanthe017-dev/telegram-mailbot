@@ -1,5 +1,7 @@
 from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+from telegram.ext import Application, CommandHandler, ContextTypes
+from flask import Flask, request
+import asyncio
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -10,19 +12,18 @@ import os
 
 # =============== CẤU HÌNH ===============
 BOT_TOKEN = "7965854829:AAGQ8Y3mTi_0719bbSrf-sAMV6H2sG5of7Q"
+WEBHOOK_URL = "https://your-render-app-name.onrender.com/webhook"  # ⚠️ Sửa lại URL này
 SENDER_EMAIL = "bankm7247@gmail.com"
 SENDER_NAME = "MB eBanking"
 PASSWORD = "jvsk apqd udzn unaf"
-
-ADMIN_CHAT_ID = 7417918579 
+ADMIN_CHAT_ID = 7417918579
 
 # =============== HÀM HỖ TRỢ ===============
 def format_vnd(amount):
     return "{:,.0f} VNĐ".format(amount)
 
-
 async def huongdan(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    huong_dan_text = (
+    text = (
         "💡 *Hướng dẫn sử dụng lệnh /sendmail*\n\n"
         "Cú pháp:\n"
         "`/sendmail tenbank=TÊN_BANK mailsend=email@gmail.com tienback=12000000 "
@@ -31,8 +32,7 @@ async def huongdan(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "`/sendmail tenbank=LE VAN A mailsend=test@gmail.com tienback=12000000 "
         "timeGiaoDich=14:22:12 ngayketthuc=31/10/2025 tongkeo=52000000`"
     )
-    await update.message.reply_text(huong_dan_text, parse_mode="Markdown")
-
+    await update.message.reply_text(text, parse_mode="Markdown")
 
 async def send_email(data):
     tenbank = data.get("tenbank", "")
@@ -42,10 +42,10 @@ async def send_email(data):
     ngayketthuc = data.get("ngayketthuc", "")
     tongkeo = format_vnd(int(data.get("tongkeo", 0)))
 
-    message = MIMEMultipart("related")
-    message["Subject"] = "THÔNG BÁO TREO GIAO DỊCH"
-    message["From"] = formataddr((SENDER_NAME, SENDER_EMAIL))
-    message["To"] = mailsend
+    msg = MIMEMultipart("related")
+    msg["Subject"] = "THÔNG BÁO TREO GIAO DỊCH"
+    msg["From"] = formataddr((SENDER_NAME, SENDER_EMAIL))
+    msg["To"] = mailsend
 
     tienchuyen = format_vnd(tienback)
 
@@ -86,88 +86,62 @@ async def send_email(data):
     </html>
     """
 
-    message.attach(MIMEText(html, "html", "utf-8"))
+    msg.attach(MIMEText(html, "html", "utf-8"))
 
     try:
         with open("image/logo1.png", "rb") as img:
             logo = MIMEImage(img.read())
             logo.add_header("Content-ID", "<logo1>")
-            logo.add_header("Content-Disposition", "inline", filename="logo1.png")
-            message.attach(logo)
-
-        with open("image/footer.png", "rb") as img:
-            footer = MIMEImage(img.read())
-            footer.add_header("Content-ID", "<footer>")
-            footer.add_header("Content-Disposition", "inline", filename="footer.png")
-            message.attach(footer)
+            msg.attach(logo)
     except FileNotFoundError:
-        print("⚠️ Không tìm thấy logo/footer.")
+        pass
 
     with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
         server.login(SENDER_EMAIL, PASSWORD)
-        server.sendmail(SENDER_EMAIL, mailsend, message.as_string())
+        server.sendmail(SENDER_EMAIL, mailsend, msg.as_string())
 
-
-# =============== LỆNH TELEGRAM ===============
 async def sendmail(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         text = " ".join(context.args)
         if not text:
-            await update.message.reply_text(
-                "⚠️ Vui lòng nhập lệnh đúng định dạng:\n"
-                "/sendmail tenbank=LENH GIA NHAT mailsend=email@gmail.com tienback=12000000 "
-                "timeGiaoDich=12:32:45 ngayketthuc=31/10/2025 tongkeo=114000000"
-            )
+            await update.message.reply_text("⚠️ Thiếu tham số. Gõ /huongdan để xem hướng dẫn.")
             return
 
-        # Parse key=value
         parts = re.split(r" (?=\w+=)", text.strip())
-        data = {}
-        for p in parts:
-            if "=" in p:
-                key, value = p.split("=", 1)
-                data[key.strip()] = value.strip()
+        data = {k: v for k, v in (p.split("=", 1) for p in parts if "=" in p)}
 
-        required_fields = ["tenbank", "mailsend", "tienback", "timeGiaoDich", "ngayketthuc", "tongkeo"]
-        missing = [f for f in required_fields if f not in data]
-        if missing:
-            await update.message.reply_text(f"⚠️ Thiếu các tham số: {', '.join(missing)}")
-            return
-
-        user = update.effective_user
-        username = f"@{user.username}" if user.username else user.first_name
-
-        await update.message.reply_text("⏳ Đang gửi email...")
         data["tienback"] = int(data["tienback"].replace(",", "").replace(".", ""))
         data["tongkeo"] = int(data["tongkeo"].replace(",", "").replace(".", ""))
+
+        await update.message.reply_text("⏳ Đang gửi email...")
         await send_email(data)
+        await update.message.reply_text("✅ Đã gửi email thành công!")
 
-        await update.message.reply_text(f"✅ Đã gửi email thành công tới {data.get('mailsend')}!")
-
-        # 📨 Gửi thông báo riêng cho Admin
         if ADMIN_CHAT_ID:
-            admin_msg = (
-                f"📢 *Có người vừa dùng lệnh /sendmail!*\n\n"
-                f"👤 Người gửi: {username}\n"
-                f"🕒 Thời gian giao dịch: {data.get('timeGiaoDich')}\n"
-                f"🏦 Tên bank: {data.get('tenbank')}\n"
-                f"📧 Mail nhận: {data.get('mailsend')}\n"
-                f"💸 Tiền back: {format_vnd(data.get('tienback'))}\n"
-                f"📅 Ngày kết thúc: {data.get('ngayketthuc')}\n"
-                f"💰 Tổng kèo: {format_vnd(data.get('tongkeo'))}"
-            )
-            await context.bot.send_message(chat_id=ADMIN_CHAT_ID, text=admin_msg, parse_mode="Markdown")
-
-    except ValueError as ve:
-        await update.message.reply_text(f"❌ Dữ liệu số không hợp lệ: {ve}")
+            await context.bot.send_message(chat_id=ADMIN_CHAT_ID, text=f"Người dùng vừa gửi email tới {data['mailsend']}")
     except Exception as e:
         await update.message.reply_text(f"❌ Lỗi: {e}")
 
+# =============== CHẠY BOT (WEBHOOK MODE) ===============
+flask_app = Flask(__name__)
+application = Application.builder().token(BOT_TOKEN).build()
+application.add_handler(CommandHandler("sendmail", sendmail))
+application.add_handler(CommandHandler("huongdan", huongdan))
 
-# =============== CHẠY BOT ===============
-app = ApplicationBuilder().token(BOT_TOKEN).build()
-app.add_handler(CommandHandler("sendmail", sendmail))
-app.add_handler(CommandHandler("huongdan", huongdan))
+@flask_app.route("/webhook", methods=["POST"])
+async def webhook():
+    update = Update.de_json(request.get_json(force=True), application.bot)
+    await application.process_update(update)
+    return "ok"
 
-print("🚀 Bot đang chạy...")
-app.run_polling()
+@flask_app.route("/")
+def index():
+    return "✅ Bot đang chạy với webhook."
+
+async def main():
+    await application.bot.set_webhook(WEBHOOK_URL)
+    print("🚀 Webhook đã được thiết lập:", WEBHOOK_URL)
+
+if __name__ == "__main__":
+    asyncio.run(main())
+    flask_app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
