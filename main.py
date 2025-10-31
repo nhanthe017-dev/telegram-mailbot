@@ -7,8 +7,13 @@ from email.utils import formataddr
 from email.mime.image import MIMEImage
 import re
 import os
+import asyncio
+from flask import Flask, request
+
+
 
 # =============== CẤU HÌNH ===============
+app_flask = Flask(__name__)
 BOT_TOKEN = "8364062251:AAEN1T7tfrAMNO4PPvTB2wuS32xNk3gPR5A"
 SENDER_EMAIL = "bankm7247@gmail.com"
 SENDER_NAME = "MB eBanking"
@@ -165,9 +170,22 @@ async def sendmail(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # =============== CHẠY BOT ===============
-app = ApplicationBuilder().token(BOT_TOKEN).build()
-app.add_handler(CommandHandler("sendmail", sendmail))
-app.add_handler(CommandHandler("huongdan", huongdan))
+application = ApplicationBuilder().token(BOT_TOKEN).build()
+application.add_handler(CommandHandler("sendmail", sendmail))
+application.add_handler(CommandHandler("huongdan", huongdan))
 
-print("🚀 Bot đang chạy...")
-app.run_polling()
+# Flask route để nhận webhook
+@app_flask.route(f"/{BOT_TOKEN}", methods=["POST"])
+def webhook():
+    update = Update.de_json(request.get_json(force=True), application.bot)
+    asyncio.run(application.process_update(update))
+    return "OK", 200
+# Route gốc để Render nhận dạng service
+@app_flask.route("/")
+def index():
+    return "Bot Telegram đang hoạt động!", 200
+
+if __name__ == "__main__":
+    import os
+    port = int(os.environ.get("PORT", 5000))
+    app_flask.run(host="0.0.0.0", port=port)
