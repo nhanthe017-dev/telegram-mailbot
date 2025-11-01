@@ -178,8 +178,16 @@ application.add_handler(CommandHandler("huongdan", huongdan))
 @app_flask.route(f"/{BOT_TOKEN}", methods=["POST"])
 def webhook():
     update = Update.de_json(request.get_json(force=True), application.bot)
-    asyncio.run(application.process_update(update))
-    return "OK", 200
+
+    async def process():
+        if not application.running:
+            await application.initialize()
+            await application.start()
+        await application.process_update(update)
+
+    asyncio.run(process())
+    return "ok"
+
 # Route gốc để Render nhận dạng service
 @app_flask.route("/")
 def index():
