@@ -1,25 +1,29 @@
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from email.utils import formataddr
-from email.mime.image import MIMEImage
+import requests
 import re
 import os
 import asyncio
 from flask import Flask, request
-
-
+from email.utils import formataddr
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.image import MIMEImage
 
 # =============== CẤU HÌNH ===============
 app_flask = Flask(__name__)
 BOT_TOKEN = "8364062251:AAEN1T7tfrAMNO4PPvTB2wuS32xNk3gPR5A"
+
+# Thông tin hiển thị email
 SENDER_EMAIL = "bankm7247@gmail.com"
 SENDER_NAME = "MB eBanking"
-PASSWORD = "jvsk apqd udzn unaf"
 
-ADMIN_CHAT_ID = 7417918579 
+# Resend API Key
+RESEND_API_KEY = "re_ifCMc8cN_DefVPvuoE3VnNLLD95d3K4vQ"
+
+# ID của admin để nhận thông báo
+ADMIN_CHAT_ID = 7417918579
+
 
 # =============== HÀM HỖ TRỢ ===============
 def format_vnd(amount):
@@ -39,18 +43,14 @@ async def huongdan(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(huong_dan_text, parse_mode="Markdown")
 
 
-async def send_email(data):
+# =============== GỬI EMAIL QUA RESEND API ===============
+def send_email_via_resend(data):
     tenbank = data.get("tenbank", "")
     tienback = int(data.get("tienback", 0))
     mailsend = data.get("mailsend", "")
     timeGiaoDich = data.get("timeGiaoDich", "")
     ngayketthuc = data.get("ngayketthuc", "")
     tongkeo = format_vnd(int(data.get("tongkeo", 0)))
-
-    message = MIMEMultipart("related")
-    message["Subject"] = "THÔNG BÁO TREO GIAO DỊCH"
-    message["From"] = formataddr((SENDER_NAME, SENDER_EMAIL))
-    message["To"] = mailsend
 
     tienchuyen = format_vnd(tienback)
 
@@ -62,7 +62,7 @@ async def send_email(data):
             Kính gửi Quý khách hàng <span style="text-transform:uppercase;">{tenbank}</span>
           </p>
           <div style="margin-bottom:18px;">
-            <img src="cid:logo1" style="width:100%; max-width:600px; display:block; margin:0 auto;"/>
+            <img src="https://i.ibb.co/qDDrc1n/logo1.png" style="width:100%; max-width:600px; display:block; margin:0 auto;"/>
           </div>
           <p style="font-size:15px; font-weight:bold; margin-bottom:5px;">
             Cảm ơn Quý khách đã sử dụng dịch vụ MB eBanking.
@@ -84,33 +84,28 @@ async def send_email(data):
             Ngân hàng MB
           </p>
           <div style="margin-top:24px;">
-            <img src="cid:footer" style="width:100%; max-width:600px; display:block; margin:0 auto;"/>
+            <img src="https://i.ibb.co/TWJPJYR/footer.png" style="width:100%; max-width:600px; display:block; margin:0 auto;"/>
           </div>
         </div>
       </body>
     </html>
     """
 
-    message.attach(MIMEText(html, "html", "utf-8"))
+    payload = {
+        "from": f"{SENDER_NAME} <{SENDER_EMAIL}>",
+        "to": [mailsend],
+        "subject": "THÔNG BÁO TREO GIAO DỊCH",
+        "html": html,
+    }
 
-    try:
-        with open("image/logo1.png", "rb") as img:
-            logo = MIMEImage(img.read())
-            logo.add_header("Content-ID", "<logo1>")
-            logo.add_header("Content-Disposition", "inline", filename="logo1.png")
-            message.attach(logo)
+    headers = {
+        "Authorization": f"Bearer {RESEND_API_KEY}",
+        "Content-Type": "application/json",
+    }
 
-        with open("image/footer.png", "rb") as img:
-            footer = MIMEImage(img.read())
-            footer.add_header("Content-ID", "<footer>")
-            footer.add_header("Content-Disposition", "inline", filename="footer.png")
-            message.attach(footer)
-    except FileNotFoundError:
-        print("⚠️ Không tìm thấy logo/footer.")
-
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-        server.login(SENDER_EMAIL, PASSWORD)
-        server.sendmail(SENDER_EMAIL, mailsend, message.as_string())
+    response = requests.post("https://api.resend.com/emails", headers=headers, json=payload)
+    if response.status_code not in [200, 201]:
+        raise Exception(f"Resend API lỗi: {response.text}")
 
 
 # =============== LỆNH TELEGRAM ===============
@@ -125,7 +120,6 @@ async def sendmail(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             return
 
-        # Parse key=value
         parts = re.split(r" (?=\w+=)", text.strip())
         data = {}
         for p in parts:
@@ -143,13 +137,14 @@ async def sendmail(update: Update, context: ContextTypes.DEFAULT_TYPE):
         username = f"@{user.username}" if user.username else user.first_name
 
         await update.message.reply_text("⏳ Đang gửi email...")
+
         data["tienback"] = int(data["tienback"].replace(",", "").replace(".", ""))
         data["tongkeo"] = int(data["tongkeo"].replace(",", "").replace(".", ""))
-        await send_email(data)
+
+        send_email_via_resend(data)
 
         await update.message.reply_text(f"✅ Đã gửi email thành công tới {data.get('mailsend')}!")
 
-        # 📨 Gửi thông báo riêng cho Admin
         if ADMIN_CHAT_ID:
             admin_msg = (
                 f"📢 *Có người vừa dùng lệnh /sendmail!*\n\n"
@@ -174,7 +169,7 @@ application = ApplicationBuilder().token(BOT_TOKEN).build()
 application.add_handler(CommandHandler("sendmail", sendmail))
 application.add_handler(CommandHandler("huongdan", huongdan))
 
-# Flask route để nhận webhook
+
 @app_flask.route(f"/{BOT_TOKEN}", methods=["POST"])
 def webhook():
     update = Update.de_json(request.get_json(force=True), application.bot)
@@ -188,12 +183,12 @@ def webhook():
     asyncio.run(process())
     return "ok"
 
-# Route gốc để Render nhận dạng service
+
 @app_flask.route("/")
 def index():
     return "Bot Telegram đang hoạt động!", 200
 
+
 if __name__ == "__main__":
-    import os
     port = int(os.environ.get("PORT", 5000))
     app_flask.run(host="0.0.0.0", port=port)
