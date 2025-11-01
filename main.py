@@ -174,14 +174,19 @@ application.add_handler(CommandHandler("huongdan", huongdan))
 def webhook():
     update = Update.de_json(request.get_json(force=True), application.bot)
 
-    async def process():
-        if not application.running:
-            await application.initialize()
-            await application.start()
-        await application.process_update(update)
+    # Dùng loop hiện tại, nếu loop bị đóng thì tạo mới
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        loop.run_until_complete(
+            application.initialize() if not application.running else asyncio.sleep(0)
+        )
+        loop.run_until_complete(application.process_update(update))
+    finally:
+        loop.close()
 
-    asyncio.run(process())
     return "ok"
+
 
 
 @app_flask.route("/")
