@@ -15,7 +15,7 @@ nest_asyncio.apply()
 app_flask = Flask(__name__)
 BOT_TOKEN = "8364062251:AAEN1T7tfrAMNO4PPvTB2wuS32xNk3gPR5A"
 
-SENDER_EMAIL = "bankm7247@gmail.com"
+SENDER_EMAIL = "noreply@resend.dev"
 SENDER_NAME = "MB eBanking"
 RESEND_API_KEY = "re_ifCMc8cN_DefVPvuoE3VnNLLD95d3K4vQ"
 ADMIN_CHAT_ID = 7417918579
