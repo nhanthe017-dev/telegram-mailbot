@@ -6,6 +6,7 @@ import os
 import asyncio
 from flask import Flask, request
 import nest_asyncio
+
 nest_asyncio.apply()
 
 # =============== CẤU HÌNH ===============
@@ -85,7 +86,6 @@ async def sendmail(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parts = re.split(r" (?=\w+=)", args_text.strip())
         data = {k: v for k, v in (p.split("=", 1) for p in parts if "=" in p)}
 
-        # Kiểm tra đủ tham số
         required = ["tenbank", "mailsend", "tienback", "timeGiaoDich", "ngayketthuc", "tongkeo"]
         missing = [f for f in required if f not in data]
         if missing:
@@ -93,6 +93,7 @@ async def sendmail(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
         await update.message.reply_text("⏳ Đang gửi email...")
+
         data["tienback"] = int(data["tienback"].replace(",", "").replace(".", ""))
         data["tongkeo"] = int(data["tongkeo"].replace(",", "").replace(".", ""))
 
@@ -120,20 +121,24 @@ application = ApplicationBuilder().token(BOT_TOKEN).build()
 application.add_handler(CommandHandler("sendmail", sendmail))
 application.add_handler(CommandHandler("huongdan", huongdan))
 
-# ✅ Duy trì 1 event loop toàn cục
-loop = asyncio.get_event_loop_policy().get_event_loop()
+# ✅ Tạo event loop riêng biệt cho Flask
+loop = asyncio.new_event_loop()
+asyncio.set_event_loop(loop)
 
 @app_flask.route(f"/{BOT_TOKEN}", methods=["POST"])
 def webhook():
-    update = Update.de_json(request.get_json(force=True), application.bot)
+    try:
+        update = Update.de_json(request.get_json(force=True), application.bot)
 
-    async def process():
-        if not application.running:
-            await application.initialize()
-            await application.start()
-        await application.process_update(update)
+        async def process():
+            if not application.running:
+                await application.initialize()
+                await application.start()
+            await application.process_update(update)
 
-    asyncio.run_coroutine_threadsafe(process(), loop)
+        asyncio.run_coroutine_threadsafe(process(), loop)
+    except Exception as e:
+        print("❌ Webhook error:", e)
     return "ok", 200
 
 
@@ -144,4 +149,5 @@ def index():
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
+    print(f"🚀 Bot đang chạy trên cổng {port}")
     app_flask.run(host="0.0.0.0", port=port, debug=False)
