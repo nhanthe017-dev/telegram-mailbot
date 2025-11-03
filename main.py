@@ -6,6 +6,8 @@ import os
 import asyncio
 from flask import Flask, request
 import nest_asyncio
+import threading
+
 
 nest_asyncio.apply()
 
@@ -148,6 +150,17 @@ def index():
 
 
 if __name__ == "__main__":
+    import nest_asyncio
+    nest_asyncio.apply()
+
+    # ✅ Tạo loop và chạy nó trong 1 thread riêng
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
+    def run_loop():
+        loop.run_forever()
+
+    threading.Thread(target=run_loop, daemon=True).start()
+
     port = int(os.environ.get("PORT", 5000))
-    print(f"🚀 Bot đang chạy trên cổng {port}")
-    app_flask.run(host="0.0.0.0", port=port, debug=False)
+    app_flask.run(host="0.0.0.0", port=port)
