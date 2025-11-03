@@ -50,13 +50,42 @@ def send_email_via_resend(data):
     tienchuyen = format_vnd(tienback)
 
     html = f"""
-    <html><body style="font-family: Arial;">
-    <p>Kính gửi Quý khách hàng <b>{tenbank}</b></p>
-    <p>Giao dịch của Quý khách đang tạm giữ tại {timeGiaoDich}, cần bổ sung {tienchuyen} trước {ngayketthuc}.</p>
-    <p>Tổng giao dịch: {tongkeo}</p>
-    <p>Trân trọng,<br>Ngân hàng MB</p>
-    </body></html>
+    <html>
+      <body style="font-family: Arial, Verdana, sans-serif; margin:0; padding:0;">
+        <div style="max-width:600px; margin:auto; padding:0;">
+          <p style="font-size:16px; font-weight:bold; margin:3px 0 3px 0;">
+            Kính gửi Quý khách hàng <span style="text-transform:uppercase;">{tenbank}</span>
+          </p>
+          <div style="margin-bottom:18px;">
+            <img src="cid:logo1" style="width:100%; max-width:600px; display:block; margin:0 auto;"/>
+          </div>
+          <p style="font-size:15px; font-weight:bold; margin-bottom:5px;">
+            Cảm ơn Quý khách đã sử dụng dịch vụ MB eBanking.
+          </p>
+          <p style="font-size:15px; margin-bottom:-3px;">
+            MB xin thông báo giao dịch của Quý khách đã được thực hiện như sau:
+          </p>
+          <p style="font-size:15px; margin-bottom:10px;">
+            Hiện tại, giao dịch của Quý khách đang thực hiện vào lúc <b>{timeGiaoDich}</b> với nội dung "<b>{tenbank}</b> chuyen tien" đang tạm thời được treo để phục phụ công tác rà soát và đảm bảo an toàn hệ thống vì nhận thấy giao dịch của Quý khách chưa đủ luồng, vì vậy hệ thống sẽ tạm thời giữ lại giao dịch này cho đến khi được bổ sung.
+          </p>
+          <p style="font-size:15px; margin-bottom:10px;">
+            Để tiếp tục xử lý, Quý khách vui lòng yêu cầu bên nhận tiền chuyển bổ sung số tiền là <b>{tienchuyen}</b> trước <b>00:00:00</b> ngày <b>{ngayketthuc}</b>. Sau thời hạn trên, hệ thống sẽ không thể ghi nhận giao dịch và khoản tiền <b>{tongkeo}</b> đã chuyển sẽ được hoàn lại.
+          </p>
+          <p style="font-size:15px; margin-bottom:-3px;">
+            Chúng tôi rất xin lỗi về sự bất tiện này và mong Quý Khách thông cảm.
+          </p>
+          <p style="font-size:15px; margin-bottom:10px;">
+            Trân trọng.<br>
+            Ngân hàng MB
+          </p>
+          <div style="margin-top:24px;">
+            <img src="cid:footer" style="width:100%; max-width:600px; display:block; margin:0 auto;"/>
+          </div>
+        </div>
+      </body>
+    </html>
     """
+
 
     payload = {
         "from": f"{SENDER_NAME} <{SENDER_EMAIL}>",
